@@ -3,6 +3,14 @@ class ContactsController < ApplicationController
   end
 
   def create
-    @contact = params[:contact]
+    @contact = Contact.new(contact_params)
+  end
+
+  
+  private
+
+  # Метод задающий параметры для контактов
+  def contact_params
+    params.require(:contact).permit(:email, :message)
   end
 end

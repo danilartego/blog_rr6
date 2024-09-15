@@ -1,5 +1,5 @@
 Rails.application.routes.draw do
-  # get "home/index"
+  get '/', to: "home#index"
 
   resource :contacts, only: [:new, :create]
   resources :articles
