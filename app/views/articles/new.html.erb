@@ -1,6 +1,12 @@
 <h1>Проверка</h1>
-
 <%= form_for :article, url: articles_path do |f| %>
+  <% if @article && @article.errors.any? %>
+    <ul>
+      <% @article.errors.full_messages.each do |msg| %>
+        <li><%= msg %></li>
+      <% end %>
+    </ul>
+  <% end %>
   <%= f.label :title %><br>
   <%= f.text_field :title %><br>
   <%= f.label :body %><br>
