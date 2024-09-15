@@ -94,7 +94,7 @@ GEM
       activesupport (>= 6.1)
     i18n (1.14.5)
       concurrent-ruby (~> 1.0)
-    jbuilder (2.12.0)
+    jbuilder (2.13.0)
       actionview (>= 5.0.0)
       activesupport (>= 5.0.0)
     listen (3.9.0)
@@ -274,9 +274,6 @@ DEPENDENCIES
   web-console (>= 4.1.0)
   webdrivers
   webpacker (~> 5.0)
-
-RUBY VERSION
-   ruby 3.2.5p208
 
 BUNDLED WITH
    2.5.18
