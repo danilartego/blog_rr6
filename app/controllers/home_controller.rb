@@ -10,5 +10,4 @@ class HomeController < ApplicationController
   def terms
     @terms = "Пользовательское соглашение"
   end
-
 end
