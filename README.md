@@ -1,229 +1,256 @@
-## Урок 39
+## Урок 40
 
-resource и resources отвечают за REST маршруты приложения, они записываются в /config/routes.rb
+#### Повторение:
 
-**resource (profile):**
+**Чтобы показать обычные статические страницы (типa /terms, /about) нам надо:**
 
-- показать - show
-- создать - new (отобразить форму. GET), create (отправить форму. POST)
-- редактировать - edit, update
-- удалить - destroy
+- создать контроллер (rails g controller ...)
+- добавить actions (методы terms, about)
+- добавить views (terms.html.erb, about.html.erb)
+- добавить в routes.rb маршруты (get 'terms' => 'pages#terms')
 
-**resources (articles):**
+В синатре это занимало 2 действия:
 
-- показать список - index
-- показать - show
-- создать - new (отобразить форму. GET), create (отправить форму. POST)
-- редактировать - edit, update
-- удалить - destroy
+- маршрут
+- views
 
-#### Продолжим делать блог
+#### Создание сущности:
 
-У нас есть http://localhost:3000/articles/new и http://localhost:3000/contacts
+- создание модели (rails g model ...)
+- rake db:migrate
+- добавить маршрут в routes.rb - resource или resources
+- добавить контроллер
+- в контроллер добавить actions (index, show, new, edit, create, update, destroy)
+- добавить views
 
-Нам нужно создать новую статью. Сделаем это. Откроем /app/controllers/articles_controller.rb и доделаем метод create
+### Продолжим делать RailsBlog, доделаем удаление Article:
 
-Посмотрим какие поля существуют в нашей сущности Article
+Чтобы удалить сущность, надо сделать 2 действия:
 
-```bash
-rails console
-Article.attribute_names
-```
+- найти сущность по id
+- удалить
 
-=> ["id", "title", "text", "created_at", "updated_at"]
-
-Внесём изменения в /app/controllers/articles_controller.rb:
+Добавим в articles_controller.rb метод destroy:
 
 ```ruby
-class ArticlesController < ApplicationController
+def destroy
+  @article = Article.find(params[:id])
+  @article.destroy
 
-  def new
-  end
+  redirect_to articles_path
+end
+```
 
-  def create
-    @article = Article.new(article_params)
-    if @article.valid?
-      @article.save
-      redirect_to @article
-    else
-      render action: 'new'
+Добавим в файл /views/articles/index.html.erb кнопку удаления статьи:
+
+```html
+<%= link_to "Destroy", article_path(article), method: :delete %>
+```
+
+или с подтверждением:
+
+```html
+<%= link_to "Destroy", article_path(article), method: :delete, data: { confirm: 'Действительно удалить?'} %>
+```
+
+К тегу ссылки на удаление добавится атрибут data-method="delete"
+
+Файл turbolinks обрабатывает атрибуты data-* встречающиеся в коде html
+
+**Разбор data-method="delete"**
+
+- скрипт сканирует страницу
+- ищет атрибут data-method="delete"
+- создаёт форму, которая будет отправлять с помощью метода delete на URL /articles/2 через POST
+- устанавливает свой обработчик, при котором при нажатии на ссылку вызывается сабмит формы
+
+#### Полезная особенность генераторов, возможность указывать reference columns - делать ссылки на другие сущности
+
+```bash
+rails g model photo album:references
+```
+
+> Изучить ссылку: https://railsguides.net/advanced-rails-model-generators/
+
+#### Добавление комментариев к статьям:
+
+one-to-many:
+
+```text
+Article -1------*- Comment
+```
+
+Создадим модель Comment:
+
+```bash
+rails g model Comment author:string body:text article:references
+rake db:migrate
+```
+
+Это добавит в файл /models/comment.rb:
+
+```ruby
+class Comment < ApplicationRecord
+  belongs_to :article
+end
+```
+
+А, вот содержимое миграции (/db/migrate/12312314_create_comments.rb):
+
+```ruby
+class CreateComments < ActiveRecord::Migration[5.2]
+  def change
+    create_table :comments do |t|
+      t.string :author
+      t.text :body
+      t.references :article, foreign_key: true
+
+      t.timestamps
     end
+  end
+end
+```
+
+Посмотрим в базе данных:
+
+```bash
+cd db
+sqlite3 development.sqlite3
+```
+
+```text
+select * from Articles;
+.tables
+select * from Comments;
+```
+
+**Посмотреть через sqlite3, какие поля есть у сущности:**
+
+```text
+pragma table_info(articles);
+```
+
+Идём дальше, чтобы добавить к статьям комментарии нам надо в /models/article.db добавить:
+
+```ruby
+class Article < ApplicationRecord
+  has_many :comments
+end
+```
+
+Таким образом мы связали 2 сущности между собой.
+
+у нас в /config/routes.rb есть строка:
+
+```ruby
+resources :articles
+```
+
+Допишем и сделаем **вложенный маршрут**:
+
+```ruby
+resources :articles do
+  resources :comments
+end
+```
+
+Команда rake routes покажет нам обновлённую карту маршрутов.
+
+**Теперь добавим контроллер:**
+
+```bash
+rails g controller Comments
+```
+
+**Далее, создадим методы в контроллере.**
+
+Для комментариев нам нужен один метод - create
+
+Посмотрим в rails console:
+
+```text
+Comment.all
+@article = Article.find(1)
+@article.comments.create({ author: 'Foo', body: 'Bar' })
+@article.comments
+```
+
+Создадим метод create в /app/controllers/comments_controller.rb:
+
+```ruby
+class CommentsController < ApplicationController
+  def create
+    @article = Article.find(params[:article_id])
+    @article.comments.create(comment_params)
+
+    redirect_to article_path(@article)
   end
 
   private
 
-  def article_params
-    params.require(:article).permit(:title, :text)
+  def comment_params
+    params.require(:comment).permit(:author, :body)
   end
 
 end
 ```
 
-Теперь нам надо создать представление для create. Создадим: /app/views/articles/create.html.erb
+**Добавление формы в представление статьи:**
 
-```html
-<h2>Спасибо!</h2>
-<p>Статья создана</p>
-```
+> Изучить ссылку: https://guides.rubyonrails.org/association_basics.html
 
-Посмотреть список статей в консоли rails:
-
-```bash
-rails console
-Article.all
-```
-
-Добавим ссылку на все статьи в /app/views/articles/create.html.erb
-
-Так не делают:
-
-```html
-<a href="/articles">Показать все статьи</a>
-```
-
-Делают так:
+> Изучить ссылку: https://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html
 
 ```ruby
-<%= link_to "Показать все статьи", articles_path %>
-```
-
-> Для борьбы с двойным сабмиттом существует паттерн PRG (Post Redirect Get)
-
-Для этого мы добавили строку:
-
-```ruby
-redirect_to @article
-```
-
-У нас происходит редирект на show поэтому представление create нам теперь не нужно, его можно удалить.
-
-Добавим в app/controllers/articles_controller.rb:
-
-```ruby
-  def show
-    @article = Article.find(params[:id])
-  end
-```
-
-Создадим представление /app/views/articles/show.html.erb
-
-```ruby
-<h1><%= @article.title %></h1>
-
-<p><%= @article.text %></p>
-```
-
-#### Вывод списка статей
-
-Список статей будет доступен по адресу http://localhost:3000/articles
-
-Добавим в контроллер /app/controllers/articles_controller.rb экшен index:
-
-```ruby
-def index
-  @articles = Article.all
-end
-```
-
-И, создадим вьюху /app/views/articles/index.html.erb
-
-```ruby
-<% @articles.each do |article| %>
-  <h3><%= article.title %></h3>
-  <p><%= article.text %></p>
-  <p><%= link_to  "Show article", article_path(article) %> | <%= link_to  "Edit article", edit_article_path(article) %></p>
-  <hr>
+<p>
+<%= form_for([@article, @comment]) do |f| %>
 <% end %>
+</p>
 ```
 
-#### Редактирование статьи (edit, update):
-
-Кнопка на редактирование:
+build:
 
 ```ruby
-<%= link_to "Edit article", edit_article_path(article) %>
+<p>
+<%= form_for([@article, @article.comments.build]) do |f| %>
+<% end %>
+</p>
 ```
 
-Добавим в /app/controllers/articles_controller.rb:
+**Добавим форму в представление (/app/views/articles/show.html.erb):**
 
 ```ruby
-def edit
-  @article = Article.find(params[:id])
-end
-```
-
-И, создадим вьюху /app/views/articles/edit.html.erb:
-
-```ruby
-<h1>Edit article</h1>
-
-<%= form_for :article, url: article_path(@article), method: :patch do |f| %>
 <p>
-  <%= f.label :title %>
-  <%= f.text_field :title %>
-</p>
-<p>
-  <%= f.label :text %>
-  <%= f.text_area :text %>
-</p>
+<%= form_for([@article, @article.comments.build]) do |f| %>
 
-<p>
-  <%= f.submit %>
-</p>
+  <p>
+    <%= f.label :author %>
+    <%= f.text_field :author %>
+  </p>
+  <p>
+    <%= f.label :body %>
+    <%= f.text_area :body %>
+  </p>
+
+  <p><%= f.submit %></p>
 
 <% end %>
+</p>
 ```
 
-Добавим в контроллер /app/controllers/articles_controller.rb экшен update:
+Проверим форму, добавив данные. И, посмотрим в рейлс-консоли
 
-```ruby
-def update
-  @article = Article.find(params[:id])
-
-  if @article.update(article_params)
-    redirect_to @article
-  else
-    render action: 'edit'
-  end
-end
+```text
+Comment.last
+Comment.all
+@article = Article.find(1)
+@article.comments
 ```
-
-#### Контроллер и роутинг статических страниц
-
-```bash
-rails g controller Pages
-```
-
-Создаётся контроллер /app/controllers/pages_controller.rb, внесём код:
-
-```ruby
-class PagesController < ApplicationController
-
-  def terms
-  end
-
-  def about
-  end
-
-end
-```
-
-И, пропишем маршруты в /config/routes.rb:
-
-```ruby
-  get 'terms' => 'pages#terms'
-  get 'about' => 'pages#about'
-```
-
-И, создадим вьюхи /app/views/pages/terms.html.erb и /app/views/pages/about.html.erb
-
-> Изучи ссылку: Rusrails: Командная строка Rails
-> http://rusrails.ru/a-guide-to-the-rails-command-line
 
 #### Домашнее задание:
 
-- переписать из rake routes
-- сделать destroy (delete)
+- Сделать вывод комментариев на странице статьи
+- Избавиться от ненужных маршрутов
+- Сравнить код BarberShop на Rails и на Sinatra
 
-> Ссылка на репозиторий с учебным блогом на Rails:
-> https://github.com/krdprog/RailsBlog-rubyschool
+---

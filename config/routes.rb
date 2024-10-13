@@ -4,5 +4,7 @@ Rails.application.routes.draw do
   get 'terms', to: "home#terms"
 
   resource :contacts, only: [:new, :create], path_names: { new: '' }
-  resources :articles
+  resources :articles do 
+    resources :comments, only: [:create]
+  end
 end
