@@ -3,4 +3,11 @@ class Article < ApplicationRecord
   validates :body, presence: true
 
   has_many :comments
+  before_destroy :delete_comments
+
+  private
+
+  def delete_comments
+    comments.destroy_all
+  end
 end
