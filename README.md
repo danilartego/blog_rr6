@@ -1,256 +1,176 @@
-## Урок 40
+## Урок 41
 
-#### Повторение:
+**Когда используется единственное число, а когда множественное?**
 
-**Чтобы показать обычные статические страницы (типa /terms, /about) нам надо:**
+- таблицы в БД - множественное число
+- модели - единственное число
+- контроллеры - множественное число
 
-- создать контроллер (rails g controller ...)
-- добавить actions (методы terms, about)
-- добавить views (terms.html.erb, about.html.erb)
-- добавить в routes.rb маршруты (get 'terms' => 'pages#terms')
+> В книге Rails. Гибкая разработка веб-приложений (Руби, Томас, Хэнссон) прочитать про соглашения об именах.
 
-В синатре это занимало 2 действия:
+#### Типы связей
 
-- маршрут
-- views
+> http://rusrails.ru/active-record-associations
 
-#### Создание сущности:
-
-- создание модели (rails g model ...)
-- rake db:migrate
-- добавить маршрут в routes.rb - resource или resources
-- добавить контроллер
-- в контроллер добавить actions (index, show, new, edit, create, update, destroy)
-- добавить views
-
-### Продолжим делать RailsBlog, доделаем удаление Article:
-
-Чтобы удалить сущность, надо сделать 2 действия:
-
-- найти сущность по id
-- удалить
-
-Добавим в articles_controller.rb метод destroy:
-
-```ruby
-def destroy
-  @article = Article.find(params[:id])
-  @article.destroy
-
-  redirect_to articles_path
-end
-```
-
-Добавим в файл /views/articles/index.html.erb кнопку удаления статьи:
-
-```html
-<%= link_to "Destroy", article_path(article), method: :delete %>
-```
-
-или с подтверждением:
-
-```html
-<%= link_to "Destroy", article_path(article), method: :delete, data: { confirm: 'Действительно удалить?'} %>
-```
-
-К тегу ссылки на удаление добавится атрибут data-method="delete"
-
-Файл turbolinks обрабатывает атрибуты data-* встречающиеся в коде html
-
-**Разбор data-method="delete"**
-
-- скрипт сканирует страницу
-- ищет атрибут data-method="delete"
-- создаёт форму, которая будет отправлять с помощью метода delete на URL /articles/2 через POST
-- устанавливает свой обработчик, при котором при нажатии на ссылку вызывается сабмит формы
-
-#### Полезная особенность генераторов, возможность указывать reference columns - делать ссылки на другие сущности
-
-```bash
-rails g model photo album:references
-```
-
-> Изучить ссылку: https://railsguides.net/advanced-rails-model-generators/
-
-#### Добавление комментариев к статьям:
-
-one-to-many:
+**Тип 1 - * (one-to-many)**
 
 ```text
-Article -1------*- Comment
+Article            |  Comment
+
+has_many :comments |  belongs_to :article
+id                 |  id, article_id
 ```
 
-Создадим модель Comment:
-
-```bash
-rails g model Comment author:string body:text article:references
-rake db:migrate
-```
-
-Это добавит в файл /models/comment.rb:
-
-```ruby
-class Comment < ApplicationRecord
-  belongs_to :article
-end
-```
-
-А, вот содержимое миграции (/db/migrate/12312314_create_comments.rb):
-
-```ruby
-class CreateComments < ActiveRecord::Migration[5.2]
-  def change
-    create_table :comments do |t|
-      t.string :author
-      t.text :body
-      t.references :article, foreign_key: true
-
-      t.timestamps
-    end
-  end
-end
-```
-
-Посмотрим в базе данных:
-
-```bash
-cd db
-sqlite3 development.sqlite3
-```
+**Тип 1 - 1 (one-to-one)** - помогает нормализовать БД
 
 ```text
-select * from Articles;
-.tables
-select * from Comments;
+Order              |  Address
+
+has_one :address   |  belongs_to :order
+id                 |  id, order_id
 ```
 
-**Посмотреть через sqlite3, какие поля есть у сущности:**
+Нормализация, денормализация. Плюсы и минусы подходов. В варианте выше потребуется ещё 1 запрос к базе данных.
+
+> Понятие complex_type - сложный тип (изучить)
+
+**Тип * - * (many-to-many)**
 
 ```text
-pragma table_info(articles);
+Tag                               |  Article
+
+таблица tags                      |  таблица articles
+id                                |  id
+has_and_belongs_to_many :articles | has_and_belongs_to_many :tags
 ```
 
-Идём дальше, чтобы добавить к статьям комментарии нам надо в /models/article.db добавить:
+для связи между ними создаётся ещё одна таблица tags_articles (tag_id, article_id)
+
+> Изучить: http://www.rusrails.ru/active-record-associations#foreign_key
+
+#### Вывод комментариев в представлении статьи:
+
+Добавим в /app/views/articles/show.html.erb:
 
 ```ruby
-class Article < ApplicationRecord
-  has_many :comments
-end
+<h3>Комментарии:</h3>
+
+<%= 'Без комментариев' if @article.comments.empty? %>
+
+<% @article.comments.each do |comment| %>
+
+<p><strong>Автор:</strong> <%= comment.author %></p>
+<p><%= comment.body %></p>
+<hr>
+
+<% end %>
 ```
 
-Таким образом мы связали 2 сущности между собой.
+#### Ещё раз про ActiveRecord
 
-у нас в /config/routes.rb есть строка:
+**Вспомним CRUD:**
+
+- Create - (new) - .create - .save
+- Read - .where - .find(3), .all
+- Update - (update)
+- Delete - (destroy)
+
+> https://github.com/rails/strong_parameters
+
+> https://guides.rubyonrails.org/action_controller_overview.html#more-examples
+
+**Вспомним REST:**
+
+- resource
+- resources
+
+Можно вкладывать, получаются длинные URL:
 
 ```ruby
-resources :articles
-```
-
-Допишем и сделаем **вложенный маршрут**:
-
-```ruby
-resources :articles do
+resources :article do
   resources :comments
 end
 ```
 
-Команда rake routes покажет нам обновлённую карту маршрутов.
+```ruby
+x = 2 != 3
+puts x #=> true
+```
 
-**Теперь добавим контроллер:**
+### Rspec - фреймворк для тестирования приложений
 
 ```bash
-rails g controller Comments
+gem install rspec
 ```
 
-**Далее, создадим методы в контроллере.**
+Запуск тестов:
 
-Для комментариев нам нужен один метод - create
-
-Посмотрим в rails console:
-
-```text
-Comment.all
-@article = Article.find(1)
-@article.comments.create({ author: 'Foo', body: 'Bar' })
-@article.comments
+```bash
+rspec
 ```
 
-Создадим метод create в /app/controllers/comments_controller.rb:
+**В Rspec существует 2 слова:**
+
+- describe
+- it
+
+**Создадим и протестируем героя компьютерной игры.**
+
+> https://github.com/krdprog/rspec-demo-rubyschool - репозиторий Rspec-demo
+
+Создадим файл hero.rb
 
 ```ruby
-class CommentsController < ApplicationController
-  def create
-    @article = Article.find(params[:article_id])
-    @article.comments.create(comment_params)
+class Hero
 
-    redirect_to article_path(@article)
+  def initialize(name, health=100)
+    @name = name.capitalize
+    @health = health
   end
 
-  private
+  attr_reader :name
 
-  def comment_params
-    params.require(:comment).permit(:author, :body)
+  def power_up
+    @health += 10
+  end
+
+  def power_down
+    @health -= 10
+  end
+
+  def hero_info
+    "#{@name} has #{@health} health"
   end
 
 end
 ```
 
-**Добавление формы в представление статьи:**
-
-> Изучить ссылку: https://guides.rubyonrails.org/association_basics.html
-
-> Изучить ссылку: https://api.rubyonrails.org/classes/ActiveRecord/Associations/ClassMethods.html
+Создадим файл hero_spec.rb:
 
 ```ruby
-<p>
-<%= form_for([@article, @comment]) do |f| %>
-<% end %>
-</p>
+require './hero'
+
+describe Hero do
+
+  it "has a capitalized name" do
+    hero = Hero.new 'foo'
+
+    expect(hero.name).to eq 'Foo'
+  end
+
+  it "can power up" do
+    hero = Hero.new 'foo'
+
+    expect(hero.power_up).to eq 110
+  end
+
+end
 ```
 
-build:
+И, запустим тест:
 
-```ruby
-<p>
-<%= form_for([@article, @article.comments.build]) do |f| %>
-<% end %>
-</p>
+```bash
+rspec hero_spec.rb
 ```
 
-**Добавим форму в представление (/app/views/articles/show.html.erb):**
-
-```ruby
-<p>
-<%= form_for([@article, @article.comments.build]) do |f| %>
-
-  <p>
-    <%= f.label :author %>
-    <%= f.text_field :author %>
-  </p>
-  <p>
-    <%= f.label :body %>
-    <%= f.text_area :body %>
-  </p>
-
-  <p><%= f.submit %></p>
-
-<% end %>
-</p>
-```
-
-Проверим форму, добавив данные. И, посмотрим в рейлс-консоли
-
-```text
-Comment.last
-Comment.all
-@article = Article.find(1)
-@article.comments
-```
-
-#### Домашнее задание:
-
-- Сделать вывод комментариев на странице статьи
-- Избавиться от ненужных маршрутов
-- Сравнить код BarberShop на Rails и на Sinatra
-
----
+Написание тестов в большом приложении - это вклад в будущее, защита приложения от ошибок.
