@@ -1,6 +1,6 @@
-<h2>Создать статью</h2>
-<!-- Форма для создания Статьи -->
-<%= form_for :article, url: articles_path do |f| %>
+<h2>Редактирование</h2>
+<!-- Форма для редактирования -->
+<%= form_for :article, url: article_path(@article), method: :put do |f| %>
   <% if @article && @article.errors.any? %>
     <ul>
       <% @article.errors.full_messages.each do |msg| %>
