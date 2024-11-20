@@ -1,113 +1,176 @@
-## Урок 42
-### Devise
+## Урок 41
 
-Devise - гем для авторизации
+**Когда используется единственное число, а когда множественное?**
 
-Добавим в Gemfile:
+- таблицы в БД - множественное число
+- модели - единственное число
+- контроллеры - множественное число
 
-```ruby
-gem 'devise'
-```
+> В книге Rails. Гибкая разработка веб-приложений (Руби, Томас, Хэнссон) прочитать про соглашения об именах.
 
-```bash
-bundle
-```
+#### Типы связей
 
-**Вывести в терминал список генераторов в системе:**
+> http://rusrails.ru/active-record-associations
 
-```bash
-rails g
-```
+**Тип 1 - * (one-to-many)**
 
 ```text
-Devise:
-  devise
-  devise:controllers
-  devise:install
-  devise:views
+Article            |  Comment
+
+has_many :comments |  belongs_to :article
+id                 |  id, article_id
 ```
 
-Введём:
+**Тип 1 - 1 (one-to-one)** - помогает нормализовать БД
 
-```bash
-rails g devise:install
+```text
+Order              |  Address
+
+has_one :address   |  belongs_to :order
+id                 |  id, order_id
 ```
 
-План, как подключать devise:
+Нормализация, денормализация. Плюсы и минусы подходов. В варианте выше потребуется ещё 1 запрос к базе данных.
 
-1. gem 'devise' в Gemfile
-2. rails g devise:install
+> Понятие complex_type - сложный тип (изучить)
 
-Проверить есть ли строка в файле config/environments/development.rb:
+**Тип * - * (many-to-many)**
+
+```text
+Tag                               |  Article
+
+таблица tags                      |  таблица articles
+id                                |  id
+has_and_belongs_to_many :articles | has_and_belongs_to_many :tags
+```
+
+для связи между ними создаётся ещё одна таблица tags_articles (tag_id, article_id)
+
+> Изучить: http://www.rusrails.ru/active-record-associations#foreign_key
+
+#### Вывод комментариев в представлении статьи:
+
+Добавим в /app/views/articles/show.html.erb:
 
 ```ruby
-config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+<h3>Комментарии:</h3>
+
+<%= 'Без комментариев' if @article.comments.empty? %>
+
+<% @article.comments.each do |comment| %>
+
+<p><strong>Автор:</strong> <%= comment.author %></p>
+<p><%= comment.body %></p>
+<hr>
+
+<% end %>
 ```
 
-Проверить, что в  /config/routes.rb указано:
+#### Ещё раз про ActiveRecord
+
+**Вспомним CRUD:**
+
+- Create - (new) - .create - .save
+- Read - .where - .find(3), .all
+- Update - (update)
+- Delete - (destroy)
+
+> https://github.com/rails/strong_parameters
+
+> https://guides.rubyonrails.org/action_controller_overview.html#more-examples
+
+**Вспомним REST:**
+
+- resource
+- resources
+
+Можно вкладывать, получаются длинные URL:
 
 ```ruby
-root to: "home#index"
+resources :article do
+  resources :comments
+end
 ```
-
-Добавить в app/views/layouts/application.html.erb для флеш-сообщений:
-
-```html
-<p class="notice"><%= notice %></p>
-<p class="alert"><%= alert %></p>
-```
-
-Для кастомизации форм:
-
-```bash
-rails g devise:views
-```
-
-**Далее, создадим модель пользователя:**
-
-```bash
-rails g devise User
-```
-
-Devise создал параметры: e-mail, зашифрованный пароль, токен для сброса пароля.
-
-**Наберём:**
-
-```bash
-rake db:migrate
-```
-
-И, запустим:
-
-```bash
-rails s
-```
-
-### Задача: чтобы мы могли просматривать статьи, но не могли их создавать.
-
-- http://localhost:3000/articles
-- http://localhost:3000/articles/new
-
-Откроем /app/controllers/articles_controller.rb и добавим:
-
-> Примечание: начиная с Rails 5 синтаксис before_filter устарел и заменён на before_action
 
 ```ruby
-before_action :authenticate_user!
+x = 2 != 3
+puts x #=> true
 ```
 
-Добавим в /app/views/layouts/application.html.erb:
+### Rspec - фреймворк для тестирования приложений
 
-```html
-<p><a href="/users/sign_in">Sign In</a> | <a href="/users/sign_out" data-method="delete">Sign Out</a></p>
+```bash
+gem install rspec
 ```
 
-Далее, мы заменим эти ссылки на ссылки с именноваными маршрутами.
+Запуск тестов:
 
-> Документация по гему devise - https://github.com/plataformatec/devise
+```bash
+rspec
+```
 
-> Статья на Хабре по devise - https://habr.com/ru/post/208056/
+**В Rspec существует 2 слова:**
 
-> Посмотреть примеры - https://github.com/plataformatec/devise/wiki/Example-applications
+- describe
+- it
 
----
+**Создадим и протестируем героя компьютерной игры.**
+
+> https://github.com/krdprog/rspec-demo-rubyschool - репозиторий Rspec-demo
+
+Создадим файл hero.rb
+
+```ruby
+class Hero
+
+  def initialize(name, health=100)
+    @name = name.capitalize
+    @health = health
+  end
+
+  attr_reader :name
+
+  def power_up
+    @health += 10
+  end
+
+  def power_down
+    @health -= 10
+  end
+
+  def hero_info
+    "#{@name} has #{@health} health"
+  end
+
+end
+```
+
+Создадим файл hero_spec.rb:
+
+```ruby
+require './hero'
+
+describe Hero do
+
+  it "has a capitalized name" do
+    hero = Hero.new 'foo'
+
+    expect(hero.name).to eq 'Foo'
+  end
+
+  it "can power up" do
+    hero = Hero.new 'foo'
+
+    expect(hero.power_up).to eq 110
+  end
+
+end
+```
+
+И, запустим тест:
+
+```bash
+rspec hero_spec.rb
+```
+
+Написание тестов в большом приложении - это вклад в будущее, защита приложения от ошибок.
