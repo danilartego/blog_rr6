@@ -1,113 +1,171 @@
-## Урок 42
-### Devise
+## Урок 43
 
-Devise - гем для авторизации
-
-Добавим в Gemfile:
+Заменим жёстко прописанные ссылки, на ссылки с именованными маршрутами:
 
 ```ruby
-gem 'devise'
+<p><%= link_to "Sign In", new_user_session_path %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %></p>
 ```
 
-```bash
-bundle
-```
+#### Далее, выведем имя пользователя при авторизации, и уберём Sign Out ссылку, когда мы не авторизованы.
 
-**Вывести в терминал список генераторов в системе:**
-
-```bash
-rails g
-```
-
-```text
-Devise:
-  devise
-  devise:controllers
-  devise:install
-  devise:views
-```
-
-Введём:
-
-```bash
-rails g devise:install
-```
-
-План, как подключать devise:
-
-1. gem 'devise' в Gemfile
-2. rails g devise:install
-
-Проверить есть ли строка в файле config/environments/development.rb:
+> https://github.com/plataformatec/devise#controller-filters-and-helpers
 
 ```ruby
-config.action_mailer.default_url_options = { host: 'localhost', port: 3000 }
+<% if user_signed_in? %>
+  Hello, <%= current_user.email %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
+<% else %>
+  <%= link_to "Sign In", new_user_session_path %>
+<% end %>
 ```
 
-Проверить, что в  /config/routes.rb указано:
+#### Авторизация, сессии
+
+- Аутентификация - проверка пользователя и пароля
+- Авторизация - наделение определёнными правами в зависимости от роли (юзер/админ)
+
+```txt
+       Login, password
+User ------------------> Server
+     <------------------
+       Cookies (*)
+```
+
+/config/initializers/devise.rb
 
 ```ruby
-root to: "home#index"
+# config.secret_key =
 ```
 
-Добавить в app/views/layouts/application.html.erb для флеш-сообщений:
+#### Механизм сессий
 
-```html
-<p class="notice"><%= notice %></p>
-<p class="alert"><%= alert %></p>
+```ruby
+session['key'] = 'value'
 ```
 
-Для кастомизации форм:
+Cookie выдаётся при первом обращении к серверу, и затем без авторизации идёт обмен данными.
+
+#### JSON - универсальный формат данных
+
+> https://ru.wikipedia.org/wiki/JSON
+
+Следующий пример показывает JSON-представление объекта, описывающего человека. В объекте есть строковые поля имени и фамилии, объект, описывающий адрес, и массив, содержащий список телефонов. Как видно из примера, значение может представлять собой вложенную структуру.
+
+```json
+{
+   "firstName": "Иван",
+   "lastName": "Иванов",
+   "address": {
+       "streetAddress": "Московское ш., 101, кв.101",
+       "city": "Ленинград",
+       "postalCode": "101101"
+   },
+   "phoneNumbers": [
+       "812 123-1234",
+       "916 123-4567"
+   ]
+}
+```
+
+#### Добавление username в наш блог, и вставка вместо поля автора комментария, username залогиненого пользователя:
 
 ```bash
-rails g devise:views
+rails g migration add_username
 ```
 
-**Далее, создадим модель пользователя:**
+Добавим в существующую таблицу новый столбец.
 
-```bash
-rails g devise User
+> https://api.rubyonrails.org/classes/ActiveRecord/Migration.html
+
+/db/migrate/20190129063426_add_username.rb
+
+```ruby
+class AddUsername < ActiveRecord::Migration[5.2]
+  def change
+    add_column :users, :username, :string
+    add_index :users, :username, unique: true
+  end
+end
 ```
-
-Devise создал параметры: e-mail, зашифрованный пароль, токен для сброса пароля.
-
-**Наберём:**
 
 ```bash
 rake db:migrate
 ```
 
-И, запустим:
+#### Индекс add_index:
 
-```bash
-rails s
-```
+Индекс - увеличивается время вставки, но уменьшается время выборки по определённому полю.
 
-### Задача: чтобы мы могли просматривать статьи, но не могли их создавать.
+#### Devise надо указать какие дополнительные параметры можно задать.
 
-- http://localhost:3000/articles
-- http://localhost:3000/articles/new
+Все контроллеры наследуются от базового контроллера ApplicationController и чтобы задать для всех контроллеров один параметр, надо прописать это в ApplicationController.
 
-Откроем /app/controllers/articles_controller.rb и добавим:
+before_action (в ранних версиях Rails это было before_filter), фильтрует методы в контроллерах до того как их обработать.
 
-> Примечание: начиная с Rails 5 синтаксис before_filter устарел и заменён на before_action
+/app/controllers/application_controller.rb:
 
 ```ruby
-before_action :authenticate_user!
+class ApplicationController < ActionController::Base
+  before_action :configure_permitted_parameters, if: :devise_controller?
+
+  protected
+
+  def configure_permitted_parameters
+    devise_parameter_sanitizer.permit(:sign_up, keys: [:username])
+  end
+end
 ```
 
-Добавим в /app/views/layouts/application.html.erb:
+#### Далее, отредактируем форму регистрации Sign Up:
 
-```html
-<p><a href="/users/sign_in">Sign In</a> | <a href="/users/sign_out" data-method="delete">Sign Out</a></p>
+Сгенерируем набор views:
+
+```bash
+rails g devise:views
 ```
 
-Далее, мы заменим эти ссылки на ссылки с именноваными маршрутами.
+Добавим в /app/views/devise/registrations/new.html.erb код поля ввода username:
 
-> Документация по гему devise - https://github.com/plataformatec/devise
+```ruby
+<div class="field">
+  <%= f.label :username %><br />
+  <%= f.text_field :username, autocomplete: "username" %>
+</div>
+```
 
-> Статья на Хабре по devise - https://habr.com/ru/post/208056/
+#### И, выведем имя вместо e-mail в /app/views/layouts/application.html.erb:
 
-> Посмотреть примеры - https://github.com/plataformatec/devise/wiki/Example-applications
+```ruby
+<% if user_signed_in? %>
+  Hello, <%= current_user.username %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
+<% else %>
+  <%= link_to "Sign In", new_user_session_path %>
+<% end %>
+```
 
----
+#### Сделаем так, чтобы при комментировании статьи автор указывался тот, кто залогинен
+
+Авторизация только для создания и редактирования статьи /app/controllers/articles_controller.rb:
+
+```ruby
+before_action :authenticate_user!, :only => [:new, :create, :edit, :update, :destroy]
+```
+
+И, для комментирования /app/controllers/comments_controller.rb:
+
+```ruby
+before_action :authenticate_user!, :only => [:create]
+```
+
+**Домашнее задание:**
+
+- Найти и изучить, что такое индексы в БД.
+- Сделать так, чтобы комментарии оставлялись под именем залогиненого пользователя.
+
+> https://andreyex.ru/bazy-dannyx/uchebnoe-posobie-po-sql/sql-indeksy/
+
+> http://www.sql.ru/articles/mssql/03013101indexes.shtml
+
+> https://habr.com/ru/post/247373/
+
+> https://ru.wikipedia.org/wiki/%D0%98%D0%BD%D0%B4%D0%B5%D0%BA%D1%81_(%D0%B1%D0%B0%D0%B7%D1%8B_%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85)
+
