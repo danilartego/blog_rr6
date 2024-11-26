@@ -1,354 +1,171 @@
-## Уроки по Ruby on Rails - Роман Пушкин
+## Урок 43
 
-### Урок 38
-
-#### Разбор вопросов на интервью:
-
-#### Задача: перевернуть все слова в предложении:
+Заменим жёстко прописанные ссылки, на ссылки с именованными маршрутами:
 
 ```ruby
-string = "В лесу родилась ёлочка в лесу она росла"
-
-puts string.split(/ /).reverse.join(' ')
+<p><%= link_to "Sign In", new_user_session_path %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %></p>
 ```
 
-На собеседовани при постановке тестовой задачи всегда уточнять требования.
+#### Далее, выведем имя пользователя при авторизации, и уберём Sign Out ссылку, когда мы не авторизованы.
 
-#### Продолжаем разбор Rails. Создадим /contacts в нашем блоге:
+> https://github.com/plataformatec/devise#controller-filters-and-helpers
 
-http://localhost:3000/contacts
+```ruby
+<% if user_signed_in? %>
+  Hello, <%= current_user.email %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
+<% else %>
+  <%= link_to "Sign In", new_user_session_path %>
+<% end %>
+```
 
-Routing Error. No route matches [GET] "/contacts"
+#### Авторизация, сессии
+
+- Аутентификация - проверка пользователя и пароля
+- Авторизация - наделение определёнными правами в зависимости от роли (юзер/админ)
+
+```txt
+       Login, password
+User ------------------> Server
+     <------------------
+       Cookies (*)
+```
+
+/config/initializers/devise.rb
+
+```ruby
+# config.secret_key =
+```
+
+#### Механизм сессий
+
+```ruby
+session['key'] = 'value'
+```
+
+Cookie выдаётся при первом обращении к серверу, и затем без авторизации идёт обмен данными.
+
+#### JSON - универсальный формат данных
+
+> https://ru.wikipedia.org/wiki/JSON
+
+Следующий пример показывает JSON-представление объекта, описывающего человека. В объекте есть строковые поля имени и фамилии, объект, описывающий адрес, и массив, содержащий список телефонов. Как видно из примера, значение может представлять собой вложенную структуру.
+
+```json
+{
+   "firstName": "Иван",
+   "lastName": "Иванов",
+   "address": {
+       "streetAddress": "Московское ш., 101, кв.101",
+       "city": "Ленинград",
+       "postalCode": "101101"
+   },
+   "phoneNumbers": [
+       "812 123-1234",
+       "916 123-4567"
+   ]
+}
+```
+
+#### Добавление username в наш блог, и вставка вместо поля автора комментария, username залогиненого пользователя:
 
 ```bash
-rails g controller contacts
+rails g migration add_username
 ```
 
-Нам нужно:
+Добавим в существующую таблицу новый столбец.
 
-- получение страницы с сервера (форма с текстовыми полями) - get (new)
-- отправка данных - post (create)
+> https://api.rubyonrails.org/classes/ActiveRecord/Migration.html
 
-Мы хотим добавить только new и create, поэтому добавим:
-
-```ruby
-resource :contacts, only: [:new, :create]
-```
-
-Добавим в /config/routes.rb
+/db/migrate/20190129063426_add_username.rb
 
 ```ruby
-Rails.application.routes.draw do
-  get 'home/index'
-
-  resource :contacts, only: [:new, :create]
-  resources :articles
+class AddUsername < ActiveRecord::Migration[5.2]
+  def change
+    add_column :users, :username, :string
+    add_index :users, :username, unique: true
+  end
 end
 ```
-
-Создадим представление: /app/views/contacts/new.html.erb
-
-Откроем http://localhost:3000/contacts/new
-
-Далее создадим модель, определимся с формой, полями:
-
-```bash
-rails g model Contact email:string message:text
-```
-
-ActiveRecord создал миграцию и файл модели + юнит-тест.
-
-- /db/migrate/20181210205054_create_contacts.rb
-- /app/models/contact.rb
 
 ```bash
 rake db:migrate
 ```
 
-У Ruby on Rails есть консоль. Запустим её:
+#### Индекс add_index:
+
+Индекс - увеличивается время вставки, но уменьшается время выборки по определённому полю.
+
+#### Devise надо указать какие дополнительные параметры можно задать.
+
+Все контроллеры наследуются от базового контроллера ApplicationController и чтобы задать для всех контроллеров один параметр, надо прописать это в ApplicationController.
+
+before_action (в ранних версиях Rails это было before_filter), фильтрует методы в контроллерах до того как их обработать.
+
+/app/controllers/application_controller.rb:
+
+```ruby
+class ApplicationController < ActionController::Base
+  before_action :configure_permitted_parameters, if: :devise_controller?
+
+  protected
+
+  def configure_permitted_parameters
+    devise_parameter_sanitizer.permit(:sign_up, keys: [:username])
+  end
+end
+```
+
+#### Далее, отредактируем форму регистрации Sign Up:
+
+Сгенерируем набор views:
 
 ```bash
-rails console
+rails g devise:views
 ```
 
-и введём в неё:
-
-```txt
-Contact.all
-```
-
-Чтобы узнать какие свойства (поля) у сущности (модели) введём:
-
-```txt
-Contact.attribute_names
-```
-
-#### Продолжим делать блог:
-
-Добавим в /app/views/contacts/new.html.erb:
+Добавим в /app/views/devise/registrations/new.html.erb код поля ввода username:
 
 ```ruby
-<h2>Contact us</h2>
+<div class="field">
+  <%= f.label :username %><br />
+  <%= f.text_field :username, autocomplete: "username" %>
+</div>
+```
 
-<%= form_for :contact, url: contacts_path do |f| %>
-<p>
-  <%= f.label :email %>
-  <%= f.text_field :email %>
-</p>
-<p>
-  <%= f.label :message %>
-  <%= f.text_area :message %>
-</p>
+#### И, выведем имя вместо e-mail в /app/views/layouts/application.html.erb:
 
-<p>
-  <%= f.submit 'Send message' %>
-</p>
-
+```ruby
+<% if user_signed_in? %>
+  Hello, <%= current_user.username %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
+<% else %>
+  <%= link_to "Sign In", new_user_session_path %>
 <% end %>
 ```
 
-Откроем http://localhost:3000/contacts/new
+#### Сделаем так, чтобы при комментировании статьи автор указывался тот, кто залогинен
 
-- :new получает GET
-- :create получает POST
-
-> Изучи ссылку: Rails Routing from the Outside In — Ruby on Rails Guides
-> https://guides.rubyonrails.org/routing.html
-
-> Изучи ссылку: Rusrails: Роутинг в Rails
-> http://rusrails.ru/rails-routing
-
-> Rails Routing from the Outside In — Ruby on Rails Guides
-> https://guides.rubyonrails.org/routing.html#singular-resources
-
-Поменять название кнопки отправки формы можно так:
+Авторизация только для создания и редактирования статьи /app/controllers/articles_controller.rb:
 
 ```ruby
-<%= f.submit 'Send message' %>
+before_action :authenticate_user!, :only => [:new, :create, :edit, :update, :destroy]
 ```
 
-> Для contact используем в единственном числе. Если у нас эта сущность будет одна и не надо выводить /contacts/1 .. /contacts/2 ..., то используем resource. Если много сущностей, используем resources.
-
-Добавим предствление /app/views/contacts/create.html.erb
-
-Запишем отправленные данные через форму в базу данных.
-
-Откроем /app/controllers/contacts_controller.rb и запишем код, но...
+И, для комментирования /app/controllers/comments_controller.rb:
 
 ```ruby
-class ContactsController < ApplicationController
-
-  def new
-  end
-
-  def create
-    @contact = Contact.new(params[:contact])
-    @contact.save
-  end
-
-end
+before_action :authenticate_user!, :only => [:create]
 ```
 
-При обращении к этим параметрам будет выпадать ошибка, т.к. аттрибуты запрещены (связано с безопасностью). Нам надо их разрешить, для этого используется специальный синтаксис:
+**Домашнее задание:**
 
-```ruby
-class ContactsController < ApplicationController
+- Найти и изучить, что такое индексы в БД.
+- Сделать так, чтобы комментарии оставлялись под именем залогиненого пользователя.
 
-  def new
-  end
+> https://andreyex.ru/bazy-dannyx/uchebnoe-posobie-po-sql/sql-indeksy/
 
-  def create
-    @contact = Contact.new(contact_params)
-    @contact.save
-  end
+> http://www.sql.ru/articles/mssql/03013101indexes.shtml
 
-  private
+> https://habr.com/ru/post/247373/
 
-  def contact_params
-    params.require(:contact).permit(:email, :message)
-  end
+> https://ru.wikipedia.org/wiki/%D0%98%D0%BD%D0%B4%D0%B5%D0%BA%D1%81_(%D0%B1%D0%B0%D0%B7%D1%8B_%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85)
 
-end
-```
-
-Если мы добавим ещё параметр, то и его надо будет указать в params.require(:contact).permit(:email, :message)
-
-Теперь мы можем добавить запись в БД через форму http://localhost:3000/contacts/new
-
-Проверим в rails console:
-
-```txt
-Contact.all
-```
-
-#### Сделаем валидацию нашей модели. Модели находятся в каталоге /app/models/
-
-Валидацию надо добавить в /app/models/contact.rb
-
-```ruby
-class Contact < ApplicationRecord
-  validates :email, presence: true
-  validates :message, presence: true
-end
-```
-
-и исправим код в контроллере /app/controllers/contacts_controller.rb:
-
-```ruby
-def create
-  @contact = Contact.new(contact_params)
-  if @contact.valid?
-    @contact.save
-  else
-    render action: 'new'
-  end
-end
-```
-
-Если при заполнении формы будет ошибка валидаци, то форм билдер нам подскажет, обернув неправильно заполненное поле в div:
-
-```html
-<div class="field_with_errors"></div>
-```
-
-Оформление можно оформить через CSS.
-
-Добавим стиль в файл /app/assets/stylesheets/application.css
-
-```css
-.field_with_errors input,
-.field_with_errors textarea {
-  border: 3px solid red;
-}
-```
-
-Есть и другие форм-билдеры, мы использовали стандартный form_for, есть ещё Simple form. Для этого подключается отдельный гем.
-
-Сейчас у нашего блога при заходе на http://localhost:3000/contacts выпадает Routing Error. No route matches [GET] "/contacts"
-
-Сделаем так, чтобы по этому адресу у нас открывалась форма из contacts/new
-
-Есть 2 способа.
-
-1. Откроем /config/routes.rb и добавим код:
-   
-   ```ruby
-   get 'contacts' => 'contacts#new'
-   ```
-   
-   Обратить внимание, что при этом мы удалили :new из строки:
-   
-   ```ruby
-   resource :contacts, only: [:create]
-   ```
-   
-   Весь файл:
-   
-   ```ruby
-   Rails.application.routes.draw do
-   get 'home/index'
-   
-   get 'contacts' => 'contacts#new'
-   resource :contacts, only: [:create]
-   resources :articles
-   end
-   ```
-
-2. Альтернативный способ при котором 1 строка отвечает за 1 сущность:
-
-```ruby
-Rails.application.routes.draw do
-  get 'home/index'
-
-  resource :contacts, only: [:new, :create], path_names: { :new => '' }
-  resources :articles
-end
-```
-
-Перенаправление по базовому пути: path_names: { :new => '' }
-
-#### Сделаем вывод списка ошибок:
-
-Откроем /app/views/contacts/new.html.erb и добавим код:
-
-```ruby
-<p><%= @contact.errors.full_messages %></p>
-```
-
-В app/controllers/contacts_controller.rb можно определить переменную:
-
-```ruby
-def new
-  @contact = Contact.new
-end
-```
-
-Либо записать вот так (в /app/views/contacts/new.html.erb):
-
-```ruby
-<% if @contact && @contact.errors.any? %>
-  <p><%= @contact.errors.full_messages %></p>
-<% end %>
-```
-
-Тогда этот блок при отсутствии переменной (т.е. при /new) не будет отображаться на странице.
-
-Оформим вывод ошибок в виде списка:
-
-```ruby
-<% if @contact && @contact.errors.any? %>
-  <ul>
-    <% @contact.errors.full_messages.each do |msg| %>
-      <li><%= msg %></li>
-    <% end %>
-  </ul>
-<% end %>
-```
-
-#### Сравним 2 таблицы
-
-> https://guides.rubyonrails.org/routing.html#singular-resources и https://guides.rubyonrails.org/routing.html#crud-verbs-and-actions
-
-(resource) singular-resources:
-
-```txt
-HTTP Verb     Path              Controller#Action   Used for
-GET           /geocoder/new     geocoders#new       return an HTML form for creating the geocoder
-POST          /geocoder         geocoders#create    create the new geocoder
-GET           /geocoder         geocoders#show      display the one and only geocoder resource
-GET           /geocoder/edit    geocoders#edit      return an HTML form for editing the geocoder
-PATCH/PUT     /geocoder         geocoders#update    update the one and only geocoder resource
-DELETE        /geocoder         geocoders#destroy   delete the geocoder resource
-```
-
-(resources) crud-verbs-and-actions:
-
-```txt
-HTTP Verb     Path            Controller#Action   Used for
-GET           /photos         photos#index        display a list of all photos
-GET           /photos/new     photos#new          return an HTML form for creating a new photo
-POST          /photos         photos#create       create a new photo
-GET           /photos/:id     photos#show         display a specific photo
-GET           /photos/:id/edit  photos#edit       return an HTML form for editing a photo
-PATCH/PUT     /photos/:id     photos#update       update a specific photo
-DELETE        /photos/:id     photos#destroy      delete a specific photo
-```
-
-- В resources есть метод выводящий всех ресурсов.
-- Следующее отличие - это /show
-
-Профиль у пользователя 1 - resource
-
-#### Домашнее задание:
-
-1. FizzBuzz тест: вывести список чисел от 1 до 100, если число делится на 3 писать Fizz, если число делится на 5 писать Buzz, если и на 3 и на 5 писать FizzBuzz иначе выводить просто само число.
-
-2. Создать в нашем блоге страницы:
-- /terms - условия использования
-
-- /about - о нашем блоге
-3. Реализовать в блоге articles#create
-
-4. Сделать редактирование статьи.
-
-5. Сделать вывод списка всех статей.

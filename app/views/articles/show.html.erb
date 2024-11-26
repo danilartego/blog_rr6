@@ -1,0 +1,20 @@
+<%= link_to 'Show all articles', articles_path, class: 'btn btn-primary btn-lg' %>
+<hr>
+<h1>Статья <%= @article.title %></h1>
+<h4><%= @article.body %></h4>
+<%= link_to "Edit", edit_article_path(@article), class: "btn btn-primary btn-sm" %>
+<hr>
+<!-- <a href="/articles">Show all articles</a><br> -->
+<!-- Форма создания коментария -->
+<%= form_for([@article, @article.comments.build]) do |f| %>
+  <%= f.label :body %><br>
+  <%= f.text_area :body %><br>
+  <%= f.submit %>
+<% end %>
+<hr>
+<!-- Список коментариев -->
+<% @article.comments.order(created_at: :desc).each do |comment| %>
+  <h4><%= comment.body %></h4>
+  <span><%= comment.author %> | <%= comment.created_at %></span>
+  <hr>
+<% end %>
