@@ -1,4 +1,6 @@
 class CommentsController < ApplicationController
+  before_action :authenticate_user!, only: [:create]
+
   def create
     @article = Article.find(params[:article_id])
     @article.comments.create(comment_params)
@@ -10,5 +12,6 @@ class CommentsController < ApplicationController
 
   def comment_params
     params.require(:comment).permit(:author, :body)
+    # params[author] = current_user.username
   end
 end
