@@ -7,10 +7,9 @@
 <!-- <a href="/articles">Show all articles</a><br> -->
 <!-- Форма создания коментария -->
 <%= form_for([@article, @article.comments.build]) do |f| %>
-  <%= f.hidden_field :author, value: current_user.username %></p>
-<p><%= f.label :body %><br>
-  <%= f.text_area :body %></p>
-<%= f.submit %>
+  <%= f.label :body %><br>
+  <%= f.text_area :body %><br>
+  <%= f.submit %>
 <% end %>
 <hr>
 <!-- Список коментариев -->
