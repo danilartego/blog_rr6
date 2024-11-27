@@ -1,112 +1,303 @@
-## Урок 45
+## Урок 46
 
-Принцип работы метода params в контроллерах: в params хранятся все параметры которые передаются из браузера в приложение.
+#### Тестирование моделей
+
+Добавить в Gemfile нашего RailsBlog:
 
 ```ruby
-private
-
-def article_params
-  params.require(:article).permit(:title, :text)
+group :test, :development do
+  gem 'rspec-rails'
+  gem 'shoulda-matchers'
+  gem 'capybara'
 end
 ```
 
-> https://stackoverflow.com/questions/18424671/what-is-params-requireperson-permitname-age-doing-in-rails-4
+```bash
+bundle install
+```
 
-> https://api.rubyonrails.org/classes/ActionController/Parameters.html#method-i-require
+**Настройка Rspec для Rails**
 
-> https://api.rubyonrails.org/classes/ActionController/Parameters.html#method-i-permit
+```bash
+rails g rspec:install
+```
 
-> https://api.rubyonrails.org/classes/ActionController/Parameters.html
+#### Настроим Shoulda-matchers, добавив в spec/rails_helper.rb:
+
+```ruby
+Shoulda::Matchers.configure do |config|
+  config.integrate do |with|
+    with.test_framework :rspec
+    with.library :rails
+  end
+end
+```
+
+> Тестирование проводится в разрабатываемом учебном проекте RailsBlog - https://github.com/krdprog/RailsBlog-rubyschool
+
+- Создадутся новые каталоги и хелперы. Создастся каталог /spec
+- Создадим для тестирования моделей каталог /spec/models
+
+Модель, которую будем тестировать (/app/models/contact.rb):
+
+```ruby
+class Contact < ApplicationRecord
+  validates :email, presence: true
+  validates :message, presence: true
+end
+```
+
+Создадим тест для модели: создать файл /spec/models/contact_spec.rb
+
+```ruby
+require 'rails_helper'
+
+describe Contact do
+  it { should validate_presence_of :email }
+  it { should validate_presence_of :message }
+end
+```
+
+Запустим тест:
+
+```bash
+rake spec
+```
+
+should - должно
+
+### Shoulda matchers:
+
+> https://relishapp.com/rspec/rspec-expectations/docs/built-in-matchers
+
+> https://matchers.shoulda.io/
+
+> http://matchers.shoulda.io/docs/v3.1.3/
+
+> https://github.com/thoughtbot/shoulda-matchers
+
+#### have_many:
+
+> http://matchers.shoulda.io/docs/v3.1.3/Shoulda/Matchers/ActiveRecord.html#have_many-instance_method
+
+Создадим тест /spec/models/article_spec.rb:
+
+```ruby
+require 'rails_helper'
+
+describe Article do
+  it { should have_many :comments }
+end
+```
+
+Создадим тест /spec/models/comment_spec.rb
+
+```ruby
+require 'rails_helper'
+
+describe Comment do
+  it { should belong_to :article }
+end
+```
+
+#### Вложенный describe - повышает читаемость тестов
+
+/spec/models/article_spec.rb:
+
+```ruby
+require 'rails_helper'
+
+describe Article do
+  describe "validations" do
+    it { should validate_presence_of :title }
+    it { should validate_presence_of :text }
+  end
+
+  describe "assotiations" do
+    it { should have_many :comments }
+  end
+end
+```
+
+Принято писать для НЕ методов:
+
+```ruby
+describe "something" do
+```
+
+А, для instance методов:
+
+```ruby
+describe "#method" do
+```
+
+Для class методов (self.method):
+
+```ruby
+describe ".method" do
+```
+
+### Добавим в /app/models/article.rb
+
+```ruby
+def subject
+  title
+end
+```
+
+И, протестируем этот метод, добавим тест в /spec/models/article_spec.rb
+
+```ruby
+require 'rails_helper'
+
+describe Article do
+  describe "#subject" do
+    it "returns the article title" do
+      article = create(:article, title: 'Foo Bar')
+
+      expect(article.subject).to  eq 'Foo Bar'
+    end
+  end
+end
+```
+
+Чтобы этот тест заработал, нужен гем factory bot
+
+#### gem Factory Girl (устарел) --> Factory Bot (использовать)
+
+Помогает при тестировании, чтобы не создавать объекты для теста, создаётся фабрика, и она будет создавать нам объекты для теста.
+
+**ВАЖНОЕ ЗАМЕЧАНИЕ!!!** Гем factory girl - устарел, надо использовать factory bot
+
+> https://github.com/thoughtbot/factory_bot/blob/v4.9.0/UPGRADE_FROM_FACTORY_GIRL.md
+
+> https://www.rubydoc.info/gems/factory_bot/file/GETTING_STARTED.md
 
 ```text
-Browser ===> Server ===> Controller ===> ActiveRecord ===> Database
-                                             ||
-                                             ===> Error
+DEPRECATION WARNING: The factory_girl gem is deprecated. Please upgrade to factory_bot. See https://github.com/thoughtbot/factory_bot/blob/v4.9.0/UPGRADE_FROM_FACTORY_GIRL.md for further instructions.
 ```
 
-**Правило:** никогда не верьте тому, что передаёт клиент.
-
-#### Are redirect_to and render exchangeable?
-
-> https://stackoverflow.com/questions/7493767/are-redirect-to-and-render-exchangeable
-
-Если используется render когда юзер обновляет страницу, то он засабмитит предыдущий POST-запрос, это может отправить дополнительные данные.
-
-Если используется redirect_to, то это будет выгдядеть как редирект.
-
-**Post/Redirect/Get (PRG) pattern:**
-
-> https://en.wikipedia.org/wiki/Post/Redirect/Get
-
-#### Хелперы:
-
-Все хелперы расположены в каталоге /app/helpers/
-
-Для каждого контроллера существует хелпер, можно вызывать различные методы из этих хелперов, из разных представлений. Хелпер - работает между контроллером и представлением. Чтобы не вставлять код в представление.
-
-Чтобы не дублировать код в каждом представлении.
-
-Логику в представлениях писать неправильно, надо выносить в хелперы. Представления предназначены для того, чтобы отображать данные. Нехорошо размазывать логику по всему приложению.
-
-Один хелпер создаётся для одного контроллера, но все хелперы доступны всем контроллерам.
-
-Существуют также **встроенные хелперы** в Rails, например **debug**, выведет список параметров.
+Добавить в Gemfile:
 
 ```ruby
-<%= debug(params) %>
+group :development, :test do
+  gem "factory_bot_rails"
+end
 ```
 
-Ещё посмотреть:
+```bash
+bundle install
+```
+
+И, добавить конфигурацию в /spec/rails_helper.rb:
 
 ```ruby
-<%= simple_format(@foo) %>
+RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
+end
 ```
 
-И, см. автоматическая подсветка ссылок - **autolinks**
+#### Как создавать фабрики:
 
-А, также **truncate - если есть длинная строка, то обрезается под указанный размер:**
+> https://www.rubydoc.info/gems/factory_bot/file/GETTING_STARTED.md#Defining_factories
+
+**Создадим каталог с фабриками - /spec/factories**
+
+И, создадим файл /spec/factories/articles.rb:
 
 ```ruby
-<%= truncate(@foo, length: 20) %>
+FactoryBot.define do
+  factory :article do
+    title { "Article title" }
+    text { "Article text" }
+  end
+end
 ```
 
-И, уже известный нам хелпер link_to.
+Преимущество использования factory bot для тестирования в том, что не нужна база данных.
 
-> См. ещё: http://rusrails.ru/action-view-overview
+> Как всё выглядит в RailsBlog см. https://github.com/krdprog/RailsBlog-rubyschool
 
-> https://guides.rubyonrails.org/form_helpers.html
-
-#### Как устроен процесс разработки в компании (CI, CD)
-
-- CI - continuous integration - непрерывная интеграция - автотест при коммитах в общий репозиторий
-- CD - continuous delivery - непрерывная доставка - автозаливка на веб-сервер
+**Создадим в /app/models/article.rb метод last_comment и протестируем его:**
 
 ```ruby
-programmer  owner
-   |   ______|
-hipchat ______ github -------
-   |__________ test server__|
-                 |
-                www (staging) --- QA
+def last_comment
+  comments.last
+end
 ```
 
-Integration tests - watir, selenium
+Добавим в /spec/models/article_spec.rb
 
-> https://github.com/watir/watir
+```ruby
+describe Article do
+  describe "#last_comment" do
+    it "returns the last comment" do
 
-> https://github.com/SeleniumHQ/selenium
+    end
+  end
+end
+```
 
-> KANBAN-доска: http://kanbanflow.com/
+Создадим фабрику /spec/factories/comments.rb:
 
-> http://trello.com/
+```ruby
+FactoryBot.define do
+  factory :comment do
+    author { "Chuck Norris" }
+    sequence(:body) { |n| "Comment body #{n}" }
+  end
+end
+```
 
-#### Vargant
+Sequences (последовательности):
 
-> https://www.vagrantup.com/
+> https://www.rubydoc.info/gems/factory_bot/file/GETTING_STARTED.md#Sequences
 
-> https://github.com/rails/rails-dev-box
+См. документацию по create_list (через поиск по странице):
+
+> https://www.rubydoc.info/gems/factory_bot/file/GETTING_STARTED.md
+
+Добавим в /spec/factories/articles.rb:
+
+```ruby
+FactoryBot.define do
+  factory :article do
+    title { "Article title" }
+    text { "Article text" }
+
+    # создаём фабрику для создания статьи с несколькими комментариями
+    factory :article_with_comments do
+      # после создания article
+      after :create do |article, evaluator|
+        # создаём список из 3-х комментариев
+        create_list :comment, 3, article: article
+      end
+    end
+  end
+end
+```
+
+В /spec/models/article_spec.rb создадим статью с комментариями для тестирования:
+
+```ruby
+require 'rails_helper'
+
+describe Article do
+  describe "#last_comment" do
+    it "returns the last comment" do
+      # создаём статью с 3 комментариями
+      article = create(:article_with_comments)
+
+      # проверка
+      expect(article.last_comment.body).to eq "Comment body 3"
+    end
+  end
+end
+```
 
 **Домашнее задание:**
 
-- поставить Vargant
-- привязать сущность article в блоге к пользователю. Сделать так, чтобы другие пользователи не могли редактировать статьи.
+- Добавить в сущность Article валидацию длины title в 140 символов и написать тесты.
+- Добавить в сущность Article валидацию длины text в 4000 символов и написать тесты.
+- В Comment добавить валидацию длины body в 4000 символов и написать тесты.
+
