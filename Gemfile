@@ -60,3 +60,8 @@ gem 'tzinfo-data', platforms: [:mingw, :mswin, :x64_mingw, :jruby]
 
 gem 'bootstrap', '~> 5.2', '>= 5.2.3'
 gem "devise", "~> 4.9"
+
+group :test, :development do
+  gem 'rspec-rails'
+  gem 'shoulda-matchers'
+end
