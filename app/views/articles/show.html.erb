@@ -1,7 +1,7 @@
 <%= link_to 'Show all articles', articles_path, class: 'btn btn-primary btn-lg' %>
 <hr>
-<h4>Статья <%= @article.title %></h4>
-<p><%= @article.body %></p>
+<h4><%= @article.title %></h4>
+<p><%= simple_format(@article.body) %></p>
 <%= link_to "Edit", edit_article_path(@article), class: "btn btn-primary btn-sm" %>
 <hr>
 <!-- <a href="/articles">Show all articles</a><br> -->
@@ -14,7 +14,7 @@
 <hr>
 <!-- Список коментариев -->
 <% @article.comments.order(created_at: :desc).each do |comment| %>
-  <h4><%= comment.body %></h4>
+  <p><%= simple_format(comment.body) %></p>
   <%= comment.author %> | <%= comment.created_at.strftime("%Y-%m-%d %H:%M:%S") %>
   <hr>
 <% end %>
