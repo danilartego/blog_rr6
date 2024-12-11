@@ -301,3 +301,17 @@ end
 - Добавить в сущность Article валидацию длины text в 4000 символов и написать тесты.
 - В Comment добавить валидацию длины body в 4000 символов и написать тесты.
 
+После переноса приложения в на другой хост нужно набрать
+Дополнительно установить nodejs и yarn
+И выполнить команды:
+
+```bash
+raild bundler
+rails bundler up
+
+rails tmp:clear
+rails assets:clobber
+rails assets:precompile
+
+rails db:migrate
+```
