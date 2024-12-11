@@ -301,6 +301,8 @@ end
 - Добавить в сущность Article валидацию длины text в 4000 символов и написать тесты.
 - В Comment добавить валидацию длины body в 4000 символов и написать тесты.
 
+### Добавлено
+
 После переноса приложения в на другой хост нужно набрать  
 Дополнительно установить nodejs и yarn  
 И выполнить команды:  
@@ -315,3 +317,47 @@ rails assets:precompile
 
 rails db:migrate
 ```
+### Правки по FactoryGirl
+
+Полный пример
+Вот полный пример того, как все эти шаги могут выглядеть вместе:
+
+Gemfile:
+```ruby
+group :test do
+  gem 'factory_bot_rails'
+end
+```
+
+rails_helper.rb или spec_helper.rb:
+```ruby
+require 'rails_helper'
+
+RSpec.configure do |config|
+  config.include FactoryBot::Syntax::Methods
+end
+```
+
+spec/factories/articles.rb:
+```ruby
+FactoryBot.define do
+  factory :article do
+    title { "My String" }
+    # Добавьте другие атрибуты при необходимости
+  end
+end
+```
+spec/models/article_spec.rb:
+```ruby
+require 'rails_helper'
+
+RSpec.describe Article, type: :model do
+  describe '#subject' do
+    it "возвращает заголовок статьи" do
+      article = create(:article, title: "Lorem Ipsum")
+      expect(article.title).to eq("Lorem Ipsum")
+    end
+  end
+end
+```
+Следуя этим шагам, вы должны устранить ошибку NoMethodError и успешно использовать метод create FactoryBot в ваших тестах с помощью RSpec.
