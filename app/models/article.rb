@@ -9,6 +9,10 @@ class Article < ApplicationRecord
     title
   end
 
+  def last_comment
+    comments.last
+  end
+
   private
 
   def delete_comments
