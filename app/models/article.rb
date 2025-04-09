@@ -5,6 +5,14 @@ class Article < ApplicationRecord
   has_many :comments, dependent: :destroy
   before_destroy :delete_comments
 
+  def subject
+    title
+  end
+
+  def last_comment
+    comments.last
+  end
+
   private
 
   def delete_comments

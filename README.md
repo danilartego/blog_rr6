@@ -1,171 +1,346 @@
-## Урок 43
+## Урок 47
 
-Заменим жёстко прописанные ссылки, на ссылки с именованными маршрутами:
+**TODO:** В конце урока требуется разобраться с парой ошибок. Оставил на потом, чтобы понять и решить как делать. Внимание.
+
+### Приёмочное тестирование (Acceptance Testing)
+
+Проверка функциональности на соответствие требованиям. Отличие от юнит-тестов, что для этих тестов обычно существует план приёмочных работ. Юнит-тесты - проверка чтобы не сломалось.
+
+> http://protesting.ru/testing/levels/acceptance.html
+
+unit:
+
+```text
+describe
+  it
+```
+
+acceptance:
+
+```text
+feature
+  scenario
+```
+
+feature scenario - это фишка Capybara
+
+### Capybara
+
+> https://www.rubydoc.info/github/teamcapybara/capybara/master
+
+feature - особенность
+scenario - сценарий
+
+Добавить в Gemfile:
 
 ```ruby
-<p><%= link_to "Sign In", new_user_session_path %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %></p>
+group :test do
+  gem 'capybara'
+end
 ```
 
-#### Далее, выведем имя пользователя при авторизации, и уберём Sign Out ссылку, когда мы не авторизованы.
+#### 2 типа тестов:
 
-> https://github.com/plataformatec/devise#controller-filters-and-helpers
+- visitor_..._spec.rb - анонимный пользователь
+- user_..._spec.rb - пользователь залогиненый в системе
+
+**Using Capybara with RSpec:**
+
+> https://github.com/teamcapybara/capybara#using-capybara-with-rspec
+
+#### Пример: Для контактной формы существует 2 сценария:
+
+1. Убедиться, что контактная форма существует.
+2. Что мы можем эту форму заполнить и отправить
+
+Проведём тестирование контактной формы в учебном приложении RailsBlog.
+
+> https://github.com/krdprog/RailsBlog-rubyschool
+
+Протестируем форму на http://localhost:3000/contacts
+
+new_contacts_path - это именованный маршрут для /contacts
+
+**Создадим каталог /spec/features** и создадим файл /spec/features/visitor_creates_contact_spec.rb:
 
 ```ruby
-<% if user_signed_in? %>
-  Hello, <%= current_user.email %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
-<% else %>
-  <%= link_to "Sign In", new_user_session_path %>
-<% end %>
+require "rails_helper"
+
+feature "Contact creation" do
+  scenario "allows acess to contacts page" do
+    visit new_contacts_path
+
+    expect(page).to have_content 'Contact us'
+  end
+end
 ```
 
-#### Авторизация, сессии
+### Работа с i18n (internationalization)
 
-- Аутентификация - проверка пользователя и пароля
-- Авторизация - наделение определёнными правами в зависимости от роли (юзер/админ)
+- Открыть файл /config/locales/en.yml
 
-```txt
-       Login, password
-User ------------------> Server
-     <------------------
-       Cookies (*)
+```yml
+en:
+  hello: "Hello world"
 ```
 
-/config/initializers/devise.rb
+- Обязательно должны быть 2 пробела, иначе yml не заработает.
 
-```ruby
-# config.secret_key =
-```
+Настройка в Sublime Text (Preferences - Settings - Syntax Specific):
 
-#### Механизм сессий
-
-```ruby
-session['key'] = 'value'
-```
-
-Cookie выдаётся при первом обращении к серверу, и затем без авторизации идёт обмен данными.
-
-#### JSON - универсальный формат данных
-
-> https://ru.wikipedia.org/wiki/JSON
-
-Следующий пример показывает JSON-представление объекта, описывающего человека. В объекте есть строковые поля имени и фамилии, объект, описывающий адрес, и массив, содержащий список телефонов. Как видно из примера, значение может представлять собой вложенную структуру.
-
-```json
+```text
 {
-   "firstName": "Иван",
-   "lastName": "Иванов",
-   "address": {
-       "streetAddress": "Московское ш., 101, кв.101",
-       "city": "Ленинград",
-       "postalCode": "101101"
-   },
-   "phoneNumbers": [
-       "812 123-1234",
-       "916 123-4567"
-   ]
+  "tab_size": 2,
+  "translate_tabs_to_spaces": true
 }
 ```
 
-#### Добавление username в наш блог, и вставка вместо поля автора комментария, username залогиненого пользователя:
+Можно создавать перевод для сайта и вызывать константы во views. Например, для русского языка можно создать /config/locales/ru.yml
 
-```bash
-rails g migration add_username
+```text
+# To use the locales, use `I18n.t`:
+#
+#     I18n.t 'hello'
+#
+# In views, this is aliased to just `t`:
+#
+#     <%= t('hello') %>
+#
+# To use a different locale, set it with `I18n.locale`:
+#
+#     I18n.locale = :es
 ```
 
-Добавим в существующую таблицу новый столбец.
+Создадим в /config/locales/en.yml:
 
-> https://api.rubyonrails.org/classes/ActiveRecord/Migration.html
+```yml
+en:
+  contacts:
+    contact_us: "Contact Us!"
+```
 
-/db/migrate/20190129063426_add_username.rb
+И, вызовем в представлении /app/views/contacts/new.html.erb:
 
 ```ruby
-class AddUsername < ActiveRecord::Migration[5.2]
-  def change
-    add_column :users, :username, :string
-    add_index :users, :username, unique: true
+<h2><%= t('contacts.contact_us') %></h2>
+```
+
+**Применение i18n в Capybara:** Исправим наш тест с учётом i18n файл /spec/features/visitor_creates_contact_spec.rb:
+
+```ruby
+require "rails_helper"
+
+feature "Contact creation" do
+  scenario "allows acess to contacts page" do
+    visit new_contacts_path
+
+    expect(page).to have_content I18n.t('contacts.contact_us')
   end
 end
 ```
 
+Запустим тест:
+
 ```bash
-rake db:migrate
+rake spec
 ```
 
-#### Индекс add_index:
+#### Следующий тест, создание самого сообщения:
 
-Индекс - увеличивается время вставки, но уменьшается время выборки по определённому полю.
+Откроем страницу с формой заявки и откроем код формы, чтобы узнать id (будем использовать в тесте):
 
-#### Devise надо указать какие дополнительные параметры можно задать.
+```html
+<input name="contact[email]" id="contact_email" type="text">
+<textarea name="contact[message]" id="contact_message"></textarea>
+```
 
-Все контроллеры наследуются от базового контроллера ApplicationController и чтобы задать для всех контроллеров один параметр, надо прописать это в ApplicationController.
-
-before_action (в ранних версиях Rails это было before_filter), фильтрует методы в контроллерах до того как их обработать.
-
-/app/controllers/application_controller.rb:
+Наш файл с тестом (features/visitor_creates_contact_spec.rb) будет выглядеть так:
 
 ```ruby
-class ApplicationController < ActionController::Base
-  before_action :configure_permitted_parameters, if: :devise_controller?
+require "rails_helper"
 
-  protected
+feature "Contact creation" do
+  scenario "allows acess to contacts page" do
+    visit new_contacts_path
 
-  def configure_permitted_parameters
-    devise_parameter_sanitizer.permit(:sign_up, keys: [:username])
+    expect(page).to have_content I18n.t('contacts.contact_us')
+  end
+
+  scenario "allows a guest to create contact" do
+    visit new_contacts_path
+    fill_in :contact_email, with: 'foo@bar.ru'
+    fill_in :contact_message, with: 'Foo Bar Baz'
+
+    click_button 'Send message'
+    expect(page).to have_content 'Thanks!'
+  end
+
+end
+```
+
+#### Следующий тест: протестировать функциональность приложения залогинившись под пользователем
+
+Сделаем сначала **тест для гостя, что он может зарегистрироваться на сайте, т.е. протестируем форму регистрации.**
+
+Создадим файл /spec/features/visitor_creates_account_spec.rb
+
+```ruby
+require "rails_helper"
+
+feature "Account Creation" do
+  scenario "allows guest to create account" do
+    visit new_user_registration_path
+
+    fill_in :user_username, with: 'FooBar'
+    fill_in :user_email, with: 'foo@bar.com'
+    fill_in :user_password, with: '1234567'
+    fill_in :user_password_confirmation, with: '1234567'
+
+    click_button 'Sign up'
+    expect(page).to have_content I18n.t('devise.registrations.signed_up')
   end
 end
 ```
 
-#### Далее, отредактируем форму регистрации Sign Up:
+devise.registrations.signed_up взято из i18n - config/locales/devise.en.yml
 
-Сгенерируем набор views:
+Запустим тест:
 
 ```bash
-rails g devise:views
+rake spec
 ```
 
-Добавим в /app/views/devise/registrations/new.html.erb код поля ввода username:
+Всё это работает с базой данных test.sqlite3
+
+**Далее проверим функциональность создания статей зарегистрированным пользователем:**
+
+Чтобы не зависеть от порядка исполнения тестов и не повотояться в коде, вынесем часть кода в метод sign_up
+
+/spec/features/visitor_creates_account_spec.rb:
 
 ```ruby
-<div class="field">
-  <%= f.label :username %><br />
-  <%= f.text_field :username, autocomplete: "username" %>
-</div>
+require "rails_helper"
+
+feature "Account Creation" do
+  scenario "allows guest to create account" do
+    sign_up
+    expect(page).to have_content I18n.t('devise.registrations.signed_up')
+  end
+end
+
+def sign_up
+  visit new_user_registration_path
+
+  fill_in :user_username, with: 'FooBar'
+  fill_in :user_email, with: 'foo@bar.com'
+  fill_in :user_password, with: '1234567'
+  fill_in :user_password_confirmation, with: '1234567'
+
+  click_button 'Sign up'
+end
 ```
 
-#### И, выведем имя вместо e-mail в /app/views/layouts/application.html.erb:
+Далее вынесем код метода sign_up в файл в каталоге /spec/support
+
+#### RSpec: before, after hooks
+
+> https://relishapp.com/rspec/rspec-core/v/3-8/docs/hooks/before-and-after-hooks
+
+Нам надо использовать sign_up в разных тестах, и чтобы не повторяться и не писать один и тот же код, мы используем before, after hooks
+
+Исполняется перед каждым тестом в feature или describe:
 
 ```ruby
-<% if user_signed_in? %>
-  Hello, <%= current_user.username %> | <%= link_to "Sign Out", destroy_user_session_path, method: :delete %>
-<% else %>
-  <%= link_to "Sign In", new_user_session_path %>
-<% end %>
+before(:each) do
+end
 ```
 
-#### Сделаем так, чтобы при комментировании статьи автор указывался тот, кто залогинен
-
-Авторизация только для создания и редактирования статьи /app/controllers/articles_controller.rb:
+Исполняется перед всеми тестами в feature или describe:
 
 ```ruby
-before_action :authenticate_user!, :only => [:new, :create, :edit, :update, :destroy]
+before(:all) do
+end
 ```
 
-И, для комментирования /app/controllers/comments_controller.rb:
+Перепишем тест /spec/features/visitor_creates_account_spec.rb:
 
 ```ruby
-before_action :authenticate_user!, :only => [:create]
+require "rails_helper"
+
+feature "Account Creation" do
+  scenario "allows guest to create account" do
+    sign_up
+    expect(page).to have_content I18n.t('devise.registrations.signed_up')
+  end
+end
 ```
 
-**Домашнее задание:**
+Мы вынесли код метода sign_up в файл /spec/support/session_helper.rb:
 
-- Найти и изучить, что такое индексы в БД.
-- Сделать так, чтобы комментарии оставлялись под именем залогиненого пользователя.
+```ruby
+def sign_up
+  visit new_user_registration_path
 
-> https://andreyex.ru/bazy-dannyx/uchebnoe-posobie-po-sql/sql-indeksy/
+  fill_in :user_username, with: 'FooBar'
+  fill_in :user_email, with: 'foo@bar.com'
+  fill_in :user_password, with: '1234567'
+  fill_in :user_password_confirmation, with: '1234567'
 
-> http://www.sql.ru/articles/mssql/03013101indexes.shtml
+  click_button 'Sign up'
+end
+```
 
-> https://habr.com/ru/post/247373/
+Создадим тест для проверки создания статьи залогиненым пользователем /spec/features/user_creates_article_spec.rb:
 
-> https://ru.wikipedia.org/wiki/%D0%98%D0%BD%D0%B4%D0%B5%D0%BA%D1%81_(%D0%B1%D0%B0%D0%B7%D1%8B_%D0%B4%D0%B0%D0%BD%D0%BD%D1%8B%D1%85)
+Решение вопроса с тем, что при выполнении тестов в нескольких тестах вызывается sign_up (и выпадает ошибка о том, что этот этот пользователь уже есть). БД создаётся перед тестами.
 
+> https://github.com/teamcapybara/capybara#transactions-and-database-setup
+
+> https://github.com/DatabaseCleaner/database_cleaner#rspec-example
+
+Добавить в Gemfile:
+
+```ruby
+group :test do
+  gem 'database_cleaner'
+end
+```
+
+```bash
+bundle install
+```
+
+Создадим файл конфигурации database_cleaner в файле /spec/support/database_cleaner.rb:
+
+```ruby
+RSpec.configure do |config|
+
+  config.before(:suite) do
+    DatabaseCleaner.strategy = :transaction
+    DatabaseCleaner.clean_with(:truncation)
+  end
+
+  config.around(:each) do |example|
+    DatabaseCleaner.cleaning do
+      example.run
+    end
+  end
+
+end
+```
+
+> Изучить документацию Capybara:
+> 
+> - https://github.com/teamcapybara/capybara
+> - https://www.rubydoc.info/github/teamcapybara/capybara/master
+
+
+Дополнения к уроку 47
+====
+Домашнее задание
+1. Посмотреть документацию по Capybara и изучить основные методы для взаимодействия с веб-страницами.
+2. Все константы, которые сделаны через I18n.t - сделать
+3. Добавить второй тест в user_creates_article_spec.rb создание статьи.
+4. Текстирование комментариев
+5. Тестирование редактирование статей
+6. Разобратся с database_cleaner и понять как он работает. (before(:each), before(:all))
